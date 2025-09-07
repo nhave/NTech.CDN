@@ -1,0 +1,505 @@
+﻿@using System.IO
+@using NTech.CDN.Components.DragDrop
+@implements IDisposable
+@inject IConfiguration Configuration
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<Card Class="shadow">
+    <CardHeader>
+        <h1>Home</h1>
+    </CardHeader>
+    <CardBody>
+        <p>This is the placeholder content for the <b>Home</b> page.</p>
+        <div class="card selection no-select">
+            <div class="selection-header">
+                <Tooltip Class="d-inline-block" Title="Create new folder in the current directory." role="button">
+                    <Button @onclick="OpenNewFolderModal">
+                        <i class="bi bi-folder-plus" style="font-size:32px;"></i>
+                    </Button>
+                </Tooltip>
+                <Tooltip Class="d-inline-block" Title="Upload files or folders to the current directory." role="button">
+                    <Button>
+                        <i class="bi bi-upload" style="font-size:32px;"></i>
+                    </Button>
+                </Tooltip>
+            </div>
+            <div class="selection-body list-group list-group-flush">
+                @if (!string.IsNullOrEmpty(subPath))
+                {
+                    <ContextTrigger ContextMenu="ContextMenu" Class="list-group-item list-group-item-action cursor-pointer fs-2 py-0" @ondblclick="GoBack">
+                        <div class="row align-items-center p-0">
+                            <div class="col-auto border-end py-2">
+                                <i class="bi bi-arrow-return-left" style="font-size:32px !important;"></i>
+                            </div>
+                            <div class="col py-2">
+                                ...
+                            </div>
+                        </div>
+                    </ContextTrigger>
+                }
+                @foreach (var item in Items)
+                {
+                    <ContextTrigger ContextMenu="ContextMenu" Item="item" Class="list-group-item list-group-item-action cursor-pointer fs-2 py-0" @ondblclick="@(_ => Open(item))">
+                        <div class="row align-items-center p-0">
+                            <div class="col-auto border-end py-2">
+                                @if (item.IsDirectory)
+                                {
+                                    <i class="bi bi-folder2" style="font-size:32px !important;"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-file-earmark bi-filetype-@item.Extension" style="font-size:32px !important;"></i>
+                                }
+                            </div>
+                            <div class="col col-ellipsis py-2">
+                                @item.Name
+                            </div>
+                        </div>
+                    </ContextTrigger>
+                }
+            </div>
+        </div>
+    </CardBody>
+</Card>
+
+<Modal @ref="EditModal" IsVerticallyCentered="true" OnHiding="OnModalClosed" BodyCssClass="p-0">
+    <HeaderTemplate>
+        @if (_modalType == ModalType.NewFolder)
+        {
+            <h5 class="modal-title">NewFolder</h5>
+        }
+        else if (_modalType == ModalType.Rename)
+        {
+            <h5 class="modal-title">Rename</h5>
+        }
+        else if (_modalType == ModalType.Delete)
+        {
+            <h5 class="modal-title">Delete</h5>
+        }
+        else if (_modalType == ModalType.Move)
+        {
+            <h5 class="modal-title">Move</h5>
+        }
+    </HeaderTemplate>
+    <BodyTemplate>
+        @if (_currentTarget == null)
+        {
+            @if (_modalType == ModalType.NewFolder)
+            {
+                <form @onsubmit="ConfirmNewFolder">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <p class="m-0">Create a new folder in the current directory.</p>
+                                <p class="text-warning-emphasis fst-italic m-0">Characters like <b class="fs-5">\ / : * ? " &lt; &gt; |</b> are not allowed!</p>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <TextInput @bind-Value="_itemName" @oninput="(e) => _itemName = e.Value!.ToString()!" Placeholder="Insert name here" Id="inputName" AutoComplete="false" aria-autocomplete="none" />
+                                    <label for="inputName">Name</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <Button Type="ButtonType.Submit" Color="@(IsValidSubmit() ? ButtonColor.Primary : ButtonColor.Secondary)" Disabled="!IsValidSubmit()">Create</Button>
+                        <Button Color="ButtonColor.Secondary" @onclick="EditModal.HideAsync">Cancel</Button>
+                    </div>
+                </form>
+            }
+        }
+        else
+        {
+            @if (_modalType == ModalType.Rename)
+            {
+                <form @onsubmit="ConfirmRename">
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <p class="m-0">Rename the @(_currentTarget.IsDirectory ? "folder" : "file"):</p>
+                                <p class="fw-bold fst-italic m-0">* @_currentTarget.Name</p>
+                                <p class="text-warning-emphasis fst-italic m-0">Characters like <b class="fs-5">\ / : * ? " &lt; &gt; |</b> are not allowed!</p>
+                                @if (!_currentTarget.IsDirectory)
+                                {
+                                    <p class="text-warning-emphasis fst-italic m-0">Changing the file extension, may make the file unreadable!</p>
+                                }
+                            </div>
+                            <div class="col-12">
+                                <div class="form-floating">
+                                    <TextInput @bind-Value="_itemName" @oninput="(e) => _itemName = e.Value!.ToString()!" Placeholder="Insert name here" Id="inputName" AutoComplete="false" aria-autocomplete="none" />
+                                    <label for="inputName">Name</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <Button Type="ButtonType.Submit" Color="@(IsValidSubmit() ? ButtonColor.Primary : ButtonColor.Secondary)" Disabled="!IsValidSubmit()">Rename</Button>
+                        <Button Color="ButtonColor.Secondary" @onclick="EditModal.HideAsync">Cancel</Button>
+                    </div>
+                </form>
+            }
+            else if (_modalType == ModalType.Delete)
+            {
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <p class="text-danger-emphasis fw-bold m-0">Are you sure you want to delete the @(_currentTarget.IsDirectory ? "folder" : "file"):</p>
+                            <p class="fw-bold fst-italic m-0">* @_currentTarget.Name</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <Button Color="ButtonColor.Danger" @onclick="ConfirmDelete">Delete</Button>
+                    <Button Color="ButtonColor.Secondary" @onclick="EditModal.HideAsync">Cancel</Button>
+                </div>
+            }
+            else if (_modalType == ModalType.Move)
+            {
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <p class="m-0">Select the directory to move the @(_currentTarget.IsDirectory ? "folder" : "file") into.</p>
+                            <p class="fw-bold fst-italic m-0">* @_currentTarget.Name</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <Button Color="ButtonColor.Primary" @onclick="EditModal.HideAsync">Move</Button>
+                    <Button Color="ButtonColor.Secondary" @onclick="EditModal.HideAsync">Cancel</Button>
+                </div>
+            }
+        }
+    </BodyTemplate>
+</Modal>
+
+<ContextMenu @ref="ContextMenu">
+    @if (context != null)
+    {
+        var fileItem = context as FileItem;
+        if (fileItem.IsDirectory)
+        {
+            <ContextItem OnClick="Open">
+                <i class="bi bi-folder2-open me-2"></i>Open
+            </ContextItem>
+            <ContextItem OnClick="RenameCurrent">
+                <i class="bi bi-pencil-square me-2"></i>Rename
+            </ContextItem>
+            <ContextItem OnClick="MoveCurrent">
+                <i class="bi bi-arrows-move me-2"></i>Move
+            </ContextItem>
+            <ContextDivider />
+            <ContextItem OnClick="CopyLink">
+                <i class="bi bi-clipboard-plus me-2"></i>Copy Link
+            </ContextItem>
+            <ContextItem Href="@fileItem.Link" Dowload="true">
+                <i class="bi bi-download me-2"></i>Download
+            </ContextItem>
+            <ContextDivider />
+            <ContextItem Class="text-danger" OnClick="DeleteCurrent">
+                <i class="bi bi-trash me-2"></i>Delete Folder
+            </ContextItem>
+        }
+        else
+        {
+            <ContextItem OnClick="Open">
+                <i class="bi bi-folder2-open me-2"></i>Open
+            </ContextItem>
+            <ContextItem OnClick="RenameCurrent">
+                <i class="bi bi-pencil-square me-2"></i>Rename
+            </ContextItem>
+            <ContextItem OnClick="MoveCurrent">
+                <i class="bi bi-arrows-move me-2"></i>Move
+            </ContextItem>
+            <ContextDivider />
+            <ContextItem OnClick="CopyLink">
+                <i class="bi bi-clipboard-plus me-2"></i>Copy Link
+            </ContextItem>
+            <ContextItem Href="@(fileItem.Link)" Dowload="true">
+                <i class="bi bi-download me-2"></i>Download
+            </ContextItem>
+            <ContextDivider />
+            <ContextItem Class="text-danger" OnClick="DeleteCurrent">
+                <i class="bi bi-trash me-2"></i>Delete File
+            </ContextItem>
+        }
+    }
+    else
+    {
+        <ContextItem OnClick="GoBack">
+            <i class="bi bi-arrow-return-left me-2"></i>Go Back
+        </ContextItem>
+    }
+</ContextMenu>
+
+@if (_modalType == ModalType.None)
+{
+    <DragDropOverlay TargetPath="@subPath" UploadSuccess="OnUploadSuccess" />
+}
+
+@code {
+    private class FileItem
+    {
+        public string Name { get; set; }
+        public bool IsDirectory { get; set; }
+        public string? Extension { get; set; }
+        public string? Link { get; set; }
+        public string RelativePath { get; set; } = "";
+    }
+
+    private List<FileItem> Items { get; set; } = new();
+    private ContextMenu ContextMenu = default!;
+    private Modal EditModal = default!;
+
+    private enum ModalType
+    {
+        None,
+        NewFolder,
+        Rename,
+        Delete,
+        Move
+    }
+
+    private string basePath;
+    private string subPath;
+    private ModalType _modalType = default!;
+    private FileItem _currentTarget = default!;
+    private string _itemName = string.Empty;
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        LoadItems();
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        LoadItems();
+        StateHasChanged();
+    }
+
+    private void LoadItems()
+    {
+        basePath = Configuration["FilePath"]!;
+
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        subPath = query["directory"]!;
+
+        var currentSubPath = subPath ?? string.Empty;
+
+        var fullPath = Path.GetFullPath(Path.Combine(basePath, currentSubPath));
+
+        if (!fullPath.StartsWith(basePath))
+        {
+            Items.Clear();
+            return;
+        }
+
+        if (Directory.Exists(fullPath))
+        {
+            var directories = Directory.GetDirectories(fullPath)
+            .Select(dir =>
+            {
+                var name = Path.GetFileName(dir);
+                var rel = CombineUrlPath(currentSubPath, name);
+                return new FileItem
+                {
+                    Name = name,
+                    IsDirectory = true,
+                    RelativePath = rel
+                };
+            });
+
+            var files = Directory.GetFiles(fullPath)
+                .Select(file =>
+                {
+                    var name = Path.GetFileName(file);
+                    var rel = CombineUrlPath(currentSubPath, name);
+                    return new FileItem
+                    {
+                        Name = name,
+                        IsDirectory = false,
+                        Extension = Path.GetExtension(file)?.TrimStart('.'),
+                        Link = "files/" + rel,
+                        RelativePath = rel
+                    };
+                });
+
+            Items = directories.Concat(files).ToList();
+        }
+    }
+
+    private void OnUploadSuccess()
+    {
+        LoadItems();
+        StateHasChanged();
+    }
+
+    private async Task OpenNewFolderModal()
+    {
+        _modalType = ModalType.NewFolder;
+        _currentTarget = default!;
+
+        await EditModal.ShowAsync();
+    }
+
+    private async Task ConfirmNewFolder()
+    {
+        if (IsValidSubmit())
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(basePath, _itemName));
+            Directory.CreateDirectory(fullPath);
+            await InvokeAsync(LoadItems);
+            await EditModal.HideAsync();
+        }
+    }
+
+    private async void Open(object item)
+    {
+        var fileItem = item as FileItem;
+        if (fileItem!.IsDirectory)
+        {
+            NavigationManager.NavigateTo($"/?directory={fileItem.RelativePath}");
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("window.open", $"files/{fileItem.RelativePath}", "_blank").ConfigureAwait(false);
+        }
+    }
+
+    string? GetParentDirectory(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !path.Contains("/"))
+            return null;
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length <= 1)
+            return null;
+
+        return "/?directory=" + string.Join('/', parts.Take(parts.Length - 1));
+    }
+
+    private void GoBack()
+    {
+        NavigationManager.NavigateTo(GetParentDirectory(subPath) ?? "/");
+    }
+
+    private async Task CopyLink(object item)
+    {
+        var fileItem = item as FileItem;
+        var url = $"files/{fileItem!.RelativePath}";
+        var escaped = url.Replace("'", "\\'");
+
+        await JSRuntime.InvokeVoidAsync(
+            "eval",
+            $"navigator.clipboard.writeText(window.location.href + '{escaped}')"
+        );
+    }
+
+    private async Task RenameCurrent(object item)
+    {
+        var fileItem = item as FileItem;
+        _modalType = ModalType.Rename;
+        _currentTarget = fileItem!;
+        _itemName = fileItem!.Name;
+
+        await EditModal.ShowAsync();
+    }
+
+    private async Task ConfirmRename()
+    {
+        if (IsValidSubmit())
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(basePath, _currentTarget.RelativePath));
+            var newPath = Path.GetFullPath(string.IsNullOrEmpty(subPath) ? Path.Combine(basePath, _itemName) : Path.Combine(basePath, subPath, _itemName));
+            if (File.Exists(fullPath))
+            {
+                File.Move(fullPath, newPath);
+                await InvokeAsync(LoadItems);
+            }
+            else if (Directory.Exists(fullPath))
+            {
+                Directory.Move(fullPath, newPath);
+                await InvokeAsync(LoadItems);
+            }
+            await EditModal.HideAsync();
+        }
+    }
+
+    private async Task DeleteCurrent(object item)
+    {
+        var fileItem = item as FileItem;
+        _modalType = ModalType.Delete;
+        _currentTarget = fileItem!;
+
+        await EditModal.ShowAsync();
+    }
+
+    private async Task ConfirmDelete()
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(basePath, _currentTarget.RelativePath));
+        Console.WriteLine($"Delete: {fullPath}");
+        if (File.Exists(fullPath))
+        {
+            File.Delete(fullPath);
+            await InvokeAsync(LoadItems);
+        }
+        else if (Directory.Exists(fullPath))
+        {
+            Directory.Delete(fullPath, true);
+            await InvokeAsync(LoadItems);
+        }
+        await EditModal.HideAsync();
+    }
+
+    private async Task MoveCurrent(object item)
+    {
+        var fileItem = item as FileItem;
+        _modalType = ModalType.Move;
+        _currentTarget = fileItem!;
+
+        await EditModal.ShowAsync();
+    }
+
+    private static string CombineUrlPath(string basePart, string leaf)
+    {
+        if (string.IsNullOrEmpty(basePart)) return leaf;
+        return $"{basePart.TrimEnd('/', '\\')}/{leaf}";
+    }
+
+    private void OnModalClosed()
+    {
+        _modalType = default!;
+        _currentTarget = default!;
+        _itemName = string.Empty;
+    }
+
+    private bool IsValidSubmit()
+    {
+        if (_modalType == ModalType.NewFolder && !string.IsNullOrWhiteSpace(_itemName))
+        {
+            return IsValidFileName(_itemName);
+        }
+        else if (_modalType == ModalType.Rename && !string.IsNullOrWhiteSpace(_itemName) && _itemName != _currentTarget?.Name)
+        {
+            return IsValidFileName(_itemName); ;
+        }
+        return false;
+    }
+
+    bool IsValidFileName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        return name.IndexOfAny(System.IO.Path.GetInvalidFileNameChars()) < 0;
+    }
+}

@@ -1,0 +1,6 @@
+services:
+  cdn:
+    image: ${DOCKER_REGISTRY-}cdn
+    build:
+      context: .
+      dockerfile: NTech.CDN/Dockerfile

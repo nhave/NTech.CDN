@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+
+    <!-- Add Blazor Bootstrap. -->
+    <link href="files/bootstrap-5.3.7-dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="files/bootstrap-icons-1.13.1/bootstrap-icons.min.css">
+    <link href="_content/Blazor.Bootstrap/blazor.bootstrap.css" rel="stylesheet" />
+
+    <!-- Add NTech Blazor. -->
+    <link href="_content/NTech.Blazor/ntech.blazor.css" rel="stylesheet" />
+    <script src="_content/NTech.Blazor/ntech.blazor.js"></script>
+
+    <link rel="stylesheet" href="@Assets["css/app.css"]" />
+    <link rel="stylesheet" href="@Assets["NTech.CDN.styles.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="_content/NTech.Blazor/favicon.png" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+
+    <!-- Add Blazor Bootstrap. -->
+    <script src="files/bootstrap-5.3.7-dist/js/bootstrap.bundle.min.js"></script>
+    <script src="files/chart.js-4.5.0/chart.umd.js"></script>
+    <script src="files/chartjs-plugin-datalabels/chartjs-plugin-datalabels.min.js"></script>
+    <script src="files/sortable.js-1.15.6/Sortable.min.js"></script>
+    <script src="_content/Blazor.Bootstrap/blazor.bootstrap.js"></script>
+</body>
+
+</html>

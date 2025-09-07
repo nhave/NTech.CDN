@@ -1,0 +1,50 @@
+﻿@inherits LayoutComponentBase
+@inject IWebHostEnvironment Env
+
+<Navbar Color="#00A0D1">
+    <StartTemplate>
+        <NavLink class="nav-item nav-link" href="">
+            <Icon Name="IconName.Files" Class="me-1" />Files
+        </NavLink>
+        <NavLink class="nav-item nav-link" href="applications">
+            <Icon Name="IconName.WindowStack" Class="me-1" />Applications
+        </NavLink>
+    </StartTemplate>
+    <EndTemplate>
+        @if (Env.IsDevelopment())
+        {
+            <a href="swagger" class="nav-item nav-link" target="_blank">
+                <i class="bi bi-swagger me-1"></i>Swagger
+            </a>
+        }
+        <ThemeMenu />
+    </EndTemplate>
+</Navbar>
+
+<ScrollingTextBG Text="N-TECH CDN" Color="#00A0D1" />
+
+<main>
+    <div class="container-xxl my-5">
+        @Body
+    </div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+</main>
+
+<Footer>
+    <StartTemplate>
+        <a href="/" class="mb-3 me-2 mb-md-0 text-decoration-none lh-1">
+            <img src="_content/NTech.Blazor/favicon.png" height="40" />
+        </a>
+        <span class="">© 2025 N-Tech</span>
+    </StartTemplate>
+    <EndTemplate>
+        <a class="nav-link no-drag" href="https://github.com/nhave/NTech.CDN" target="_blank">
+            <Icon Name="IconName.Github" />
+        </a>
+    </EndTemplate>
+</Footer>

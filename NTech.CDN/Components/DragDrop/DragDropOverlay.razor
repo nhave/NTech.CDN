@@ -1,0 +1,88 @@
+﻿@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (IsVisible)
+{
+    <div class="dragdrop-backdrop" @onclick="Hide">
+        <div class="dragdrop-card card shadow">
+            <h5 class="card-header">Slip filen her</h5>
+            <div class="card-body text-center">
+                <p class="card-text">Træk og slip en fil eller mappe for at uploade</p>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string TargetPath { get; set; } = "/";
+    [Parameter] public EventCallback UploadSuccess { get; set; }
+
+    private bool IsVisible { get; set; }
+    private DotNetObjectReference<DragDropOverlay>? _objRef;
+    private IJSObjectReference? _module;
+    private IJSObjectReference? _instance;
+
+    private string? _lastPath;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_module is not null && TargetPath != _lastPath)
+        {
+            _lastPath = TargetPath;
+            try
+            {
+                await _module.InvokeVoidAsync("updatePath", TargetPath);
+            }
+            catch (JSDisconnectedException) { }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _objRef = DotNetObjectReference.Create(this);
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/dragdrop.js");
+            _instance = await _module.InvokeAsync<IJSObjectReference>("init", _objRef, TargetPath);
+        }
+    }
+
+    [JSInvokable]
+    public void Show()
+    {
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void Hide()
+    {
+        IsVisible = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public async Task OnUploadSuccess()
+    {
+        await UploadSuccess.InvokeAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_instance is not null)
+            {
+                await _instance.InvokeVoidAsync("dispose");
+                await _instance.DisposeAsync();
+            }
+            if (_module is not null)
+            {
+                await _module.DisposeAsync();
+            }
+        }
+        catch (JSDisconnectedException) {}
+
+        _objRef?.Dispose();
+    }
+}
